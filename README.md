@@ -4,13 +4,13 @@ A modern music player for your osu! beatmap collection with Discord Rich Presenc
 
 ## Features
 
-- 🎵 Play music from your osu! beatmap collection
-- 🔍 Real-time search with autocomplete
-- 🎨 Beautiful UI with beatmap backgrounds
-- 🔊 Volume control with visual slider
-- 🎮 Discord Rich Presence integration
-- 📊 Progress bar with timestamps
-- 🖼️ Beatmap cover images display
+- Play music from your osu! beatmap collection
+- Real-time search with autocomplete
+- Beautiful UI with beatmap backgrounds
+- Volume control with visual slider
+- Discord Rich Presence integration
+- Progress bar with timestamps
+- Beatmap cover images display
 
 ## Prerequisites
 
