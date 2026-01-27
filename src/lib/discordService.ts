@@ -33,11 +33,34 @@ export async function connectDiscord(): Promise<void> {
     console.warn('[Discord] Disconnected');
   });
 
-  client.login().catch(catchDiscordActivityError);
+  try {
+    await client.login();
+    console.log('[Discord] Login initiated');
+  } catch (error) {
+    console.error('[Discord] Login failed:', error);
+  }
 }
 
-export async function updateDiscordPlaying(title: string, artist: string, beatmapSetID: string): Promise<void> {
-  if (!isConnected || !client) return;
+export async function updateDiscordPlaying(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0): Promise<void> {
+  console.log('[Discord] updateDiscordPlaying called:', { title, artist, beatmapSetID, isConnected, hasClient: !!client });
+  
+  if (!client) {
+    console.warn('[Discord] Client null, attempting to connect...');
+    await connectDiscord();
+  }
+  
+  if (!isConnected) {
+    console.warn('[Discord] Not connected, waiting for connection...');
+    let attempts = 0;
+    while (!isConnected && attempts < 10) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      attempts++;
+    }
+    if (!isConnected) {
+      console.error('[Discord] Failed to connect after 10 attempts');
+      return;
+    }
+  }
 
   const response = await fetch(
     `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`,
@@ -49,14 +72,38 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
     largeImageKey = 'logo';
   }
 
+  // Calculate timestamps for song progress
+  console.log('[Discord] Timestamp calculation:', { currentTime, duration });
+  
+  // Handle null/undefined values
+  const safeDuration = duration && duration > 0 ? duration : 0;
+  const safeCurrentTime = currentTime && currentTime > 0 ? currentTime : 0;
+  
+  // Only set timestamps if we have valid duration
+  let startTimestamp: number | undefined;
+  let endTimestamp: number | undefined;
+  
+  if (safeDuration > 0) {
+    endTimestamp = Math.floor(Date.now() / 1000) + Math.floor(safeDuration - safeCurrentTime);
+    startTimestamp = endTimestamp - Math.floor(safeDuration);
+  }
+  
+  console.log('[Discord] Calculated timestamps:', { startTimestamp, endTimestamp, safeDuration, safeCurrentTime });
+
   const presence: SetActivity = {
     details: title,
     state: artist,
     type: 2,
-    largeImageKey,
+    largeImageKey: largeImageKey,
     buttons: [],
   };
 
+  // Only add timestamps if they're valid
+  if (startTimestamp && endTimestamp) {
+    presence.startTimestamp = startTimestamp;
+    presence.endTimestamp = endTimestamp;
+  }
+
   if (beatmapSetID) {
     presence.buttons?.push({
       label: 'Go to this map on osu!',
@@ -64,11 +111,29 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
     });
   }
 
-  client.user?.setActivity(presence).catch(catchDiscordActivityError);
+  console.log('[Discord] Setting activity:', presence);
+  client?.user?.setActivity(presence).catch(catchDiscordActivityError);
+  console.log('[Discord] Activity set command sent');
 }
 
-export async function updateDiscordPaused(title: string, artist: string, beatmapSetID: string): Promise<void> {
-  if (!isConnected || !client) return;
+export async function updateDiscordPaused(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0): Promise<void> {
+  if (!client) {
+    console.warn('[Discord] Client null, attempting to connect...');
+    await connectDiscord();
+  }
+  
+  if (!isConnected) {
+    console.warn('[Discord] Not connected, waiting for connection...');
+    let attempts = 0;
+    while (!isConnected && attempts < 10) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      attempts++;
+    }
+    if (!isConnected) {
+      console.error('[Discord] Failed to connect after 10 attempts');
+      return;
+    }
+  }
 
   const response = await fetch(
     `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`,
@@ -80,14 +145,38 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
     largeImageKey = 'logo';
   }
 
+  // Calculate timestamps for song progress (paused state doesn't show elapsed time)
+  console.log('[Discord] Timestamp calculation (paused):', { currentTime, duration });
+  
+  // Handle null/undefined values
+  const safeDuration = duration && duration > 0 ? duration : 0;
+  const safeCurrentTime = currentTime && currentTime > 0 ? currentTime : 0;
+  
+  // Only set timestamps if we have valid duration
+  let startTimestamp: number | undefined;
+  let endTimestamp: number | undefined;
+  
+  if (safeDuration > 0) {
+    endTimestamp = Math.floor(Date.now() / 1000) + Math.floor(safeDuration - safeCurrentTime);
+    startTimestamp = endTimestamp - Math.floor(safeDuration);
+  }
+  
+  console.log('[Discord] Calculated timestamps (paused):', { startTimestamp, endTimestamp, safeDuration, safeCurrentTime });
+
   const presence: SetActivity = {
     details: title,
     state: artist,
     type: 2,
-    largeImageKey,
+    largeImageKey: largeImageKey,
     largeImageText: 'Paused',
-    buttons: [{ label: 'Check out osu!radio', url: 'https://github.com/L3ne/osu-radio' }],
+    buttons: [],
   };
+
+  // Only add timestamps if they're valid
+  if (startTimestamp && endTimestamp) {
+    presence.startTimestamp = startTimestamp;
+    presence.endTimestamp = endTimestamp;
+  }
 
   if (beatmapSetID) {
     presence.buttons?.push({
@@ -96,7 +185,7 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
     });
   }
 
-  client.user?.setActivity(presence).catch(catchDiscordActivityError);
+  client?.user?.setActivity(presence).catch(catchDiscordActivityError);
 }
 
 // Auto-connect on import

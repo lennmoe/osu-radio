@@ -65,9 +65,8 @@ export default function Home(): JSX.Element {
     audio.volume = volume;
 
     const updateTime = (): void => {
-      // Don't update state continuously to avoid Discord RPC spam
-      // setCurrentTime(audio.currentTime);
-      // setDuration(audio.duration || 0);
+      setCurrentTime(audio.currentTime);
+      setDuration(audio.duration || 0);
     };
 
     const handleEnded = (): void => {
@@ -91,16 +90,39 @@ export default function Home(): JSX.Element {
     if (!song) return;
 
     const audio = audioRef.current;
-    if (!audio || audio.duration === 0) return;
+    if (!audio) return;
 
-    const currentPos = audio.currentTime;
-    const totalDuration = audio.duration;
+    // Wait for audio metadata to load with timeout
+    const updateDiscord = () => {
+      const currentPos = audio.currentTime;
+      const totalDuration = audio.duration;
 
-    fetch('/api/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ song, isPlaying, currentTime: currentPos, duration: totalDuration }),
-    }).catch(console.error);
+      console.log('[App] Discord update:', { currentPos, totalDuration, isPlaying });
+
+      fetch('/api/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ song, isPlaying, currentTime: currentPos, duration: totalDuration }),
+      }).catch(console.error);
+    };
+
+    // Try immediately if duration is available
+    if (audio.duration > 0) {
+      updateDiscord();
+    } else {
+      // Wait for metadata with timeout
+      let attempts = 0;
+      const maxAttempts = 10;
+      const checkInterval = setInterval(() => {
+        attempts++;
+        console.log(`[App] Checking audio metadata (attempt ${attempts}):`, audio.duration);
+        
+        if (audio.duration > 0 || attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          updateDiscord();
+        }
+      }, 500);
+    }
   }, [songs, currentIndex, isPlaying]);
 
   const handleScan = async (): Promise<void> => {
