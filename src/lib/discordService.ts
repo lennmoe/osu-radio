@@ -172,12 +172,6 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
     buttons: [],
   };
 
-  // Only add timestamps if they're valid
-  if (startTimestamp && endTimestamp) {
-    presence.startTimestamp = startTimestamp;
-    presence.endTimestamp = endTimestamp;
-  }
-
   if (beatmapSetID) {
     presence.buttons?.push({
       label: 'Go to this map on osu!',
