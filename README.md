@@ -6,7 +6,6 @@ A modern music player for your osu! beatmap collection with Discord Rich Presenc
 
 - Play music from your osu! beatmap collection
 - Real-time search with autocomplete
-- Beautiful UI with beatmap backgrounds
 - Volume control with visual slider
 - Discord Rich Presence integration
 - Progress bar with timestamps
@@ -81,30 +80,6 @@ A modern music player for your osu! beatmap collection with Discord Rich Presenc
    - Adjust volume with the slider
    - Your Discord status will update automatically
 
-## Project Structure
-
-```
-osu radio/
-├── src/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── audio/      # Audio streaming endpoint
-│   │   │   ├── scan/       # Beatmap scanning endpoint
-│   │   │   └── update/     # Discord RPC update endpoint
-│   │   ├── globals.css     # Global styles
-│   │   ├── layout.tsx      # App layout
-│   │   └── page.tsx        # Main page
-│   ├── lib/
-│   │   ├── discordService.ts  # Discord RPC service
-│   │   └── scanner.ts         # osu! folder scanner
-│   └── types/
-│       └── index.ts        # TypeScript types
-├── .env                    # Environment variables (gitignored)
-├── .env.example            # Environment variables example
-├── package.json            # Dependencies
-└── README.md              # This file
-```
-
 ## Configuration
 
 ### Environment Variables
@@ -125,16 +100,6 @@ Edit `src/lib/discordService.ts`:
 ```typescript
 details: 'Your custom message',
 ```
-
-## Technologies
-
-- **Framework:** Next.js 14 (App Router)
-- **Runtime:** Bun
-- **Styling:** TailwindCSS
-- **Discord RPC:** @xhayper/discord-rpc
-- **Language:** TypeScript
-
-## Troubleshooting
 
 ### Discord RPC not working
 
@@ -171,12 +136,3 @@ bun run build
 ```bash
 bun start
 ```
-
-## License
-
-MIT
-
-## Credits
-
-- osu! by [ppy](https://osu.ppy.sh/)
-- Discord RPC library by [@xhayper](https://github.com/xhayper/discord-rpc)
