@@ -8,11 +8,12 @@ import {
   IoPlaySkipBackSharp,
   IoPlaySkipForwardSharp,
   IoShuffle,
+  IoRepeat,
   IoHeart,
   IoHeartOutline,
 } from 'react-icons/io5';
 import { HiVolumeUp, HiVolumeOff } from 'react-icons/hi';
-import { Song, PlaybackMod } from '@/types';
+import { Song, PlaybackMod, RepeatMode } from '@/types';
 import { ModSelector } from './ModSelector';
 
 interface PlayerControlsProps {
@@ -23,6 +24,8 @@ interface PlayerControlsProps {
   rate: number;
   volume: number;
   mod: PlaybackMod;
+  repeat: RepeatMode;
+  queueCount: number;
   audioRef: RefObject<HTMLAudioElement>;
   isLiked: boolean;
   onTogglePlay: () => void;
@@ -32,6 +35,7 @@ interface PlayerControlsProps {
   onSeek: (time: number) => void;
   onVolumeChange: (volume: number) => void;
   onModChange: (mod: PlaybackMod) => void;
+  onCycleRepeat: () => void;
   onToggleLike: () => void;
 }
 
@@ -50,6 +54,8 @@ export function PlayerControls({
   rate,
   volume,
   mod,
+  repeat,
+  queueCount,
   audioRef,
   isLiked,
   onTogglePlay,
@@ -59,6 +65,7 @@ export function PlayerControls({
   onSeek,
   onVolumeChange,
   onModChange,
+  onCycleRepeat,
   onToggleLike,
 }: PlayerControlsProps): JSX.Element {
   const [likePop, setLikePop] = useState(false);
@@ -157,6 +164,22 @@ export function PlayerControls({
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.9 }}
+          onClick={onCycleRepeat}
+          className={`relative p-2.5 rounded-xl transition ${
+            repeat === 'off'
+              ? 'text-white/60 hover:text-white hover:bg-white/10'
+              : 'text-primary bg-primary/15'
+          }`}
+          aria-label={`Repeat: ${repeat}`}
+          title={`Repeat: ${repeat}`}
+        >
+          <IoRepeat className="w-5 h-5" />
+          {repeat === 'one' && (
+            <span className="absolute top-1 right-1 text-[9px] font-bold leading-none">1</span>
+          )}
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
           onClick={handleLike}
           className={`relative p-2.5 rounded-xl transition ${
             isLiked ? 'text-primary bg-primary/15' : 'text-white/60 hover:text-white hover:bg-white/10'
@@ -202,7 +225,12 @@ export function PlayerControls({
           </div>
         </div>
 
-        <ModSelector mod={mod} onChange={onModChange} />
+        <div className="flex items-center gap-3">
+          {queueCount > 0 && (
+            <span className="text-xs text-white/45 tabular-nums">{queueCount} queued</span>
+          )}
+          <ModSelector mod={mod} onChange={onModChange} />
+        </div>
       </div>
     </motion.div>
   );

@@ -13,6 +13,17 @@ export interface Song {
 
 export type PlaybackMod = 'none' | 'dt' | 'nc';
 
+export type RepeatMode = 'off' | 'all' | 'one';
+
+export type SortKey = 'artist' | 'title' | 'bpm' | 'added';
+
+export const SORT_LABEL: Record<SortKey, string> = {
+  artist: 'Artist',
+  title: 'Title',
+  bpm: 'BPM',
+  added: 'Newest',
+};
+
 export const MOD_RATE: Record<PlaybackMod, number> = {
   none: 1,
   dt: 1.5,
