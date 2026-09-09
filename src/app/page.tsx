@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { MOD_LABEL, MOD_RATE, PlaybackMod, Song } from '@/types';
+import { MOD_LABEL, MOD_RATE, PlaybackMod, RepeatMode, Song } from '@/types';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { TopBar } from '@/components/TopBar';
 import { PlayerStage } from '@/components/PlayerStage';
@@ -10,6 +10,10 @@ import { PlayerControls } from '@/components/PlayerControls';
 import { LibraryPanel } from '@/components/LibraryPanel';
 import { useLikes } from '@/hooks/useLikes';
 import { usePlaybackMod } from '@/hooks/usePlaybackMod';
+import { useAccentColor } from '@/hooks/useAccentColor';
+import { useMediaSession } from '@/hooks/useMediaSession';
+
+const REPEAT_KEY = 'osu-radio-repeat';
 
 export default function Home(): JSX.Element {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -19,6 +23,8 @@ export default function Home(): JSX.Element {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [mod, setMod] = useState<PlaybackMod>('none');
+  const [repeat, setRepeat] = useState<RepeatMode>('off');
+  const [queue, setQueue] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(true);
 
@@ -28,6 +34,16 @@ export default function Home(): JSX.Element {
   const currentSong = songs[currentIndex];
   const rate = MOD_RATE[mod];
 
+  const songsById = useMemo(() => new Map(songs.map((s) => [s.id, s])), [songs]);
+  const queueSongs = useMemo(
+    () => queue.map((id) => songsById.get(id)).filter((s): s is Song => Boolean(s)),
+    [queue, songsById],
+  );
+
+  const coverUrl = currentSong
+    ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/list@2x.jpg`
+    : '';
+
   usePlaybackMod({
     audioRef,
     mod,
@@ -35,6 +51,21 @@ export default function Home(): JSX.Element {
     bpm: currentSong?.bpm ?? 0,
     trackKey: currentSong?.id ?? '',
   });
+  useAccentColor(coverUrl);
+
+  // --- Repeat mode persistence -------------------------------------------
+  useEffect(() => {
+    const stored = localStorage.getItem(REPEAT_KEY) as RepeatMode | null;
+    if (stored === 'off' || stored === 'all' || stored === 'one') setRepeat(stored);
+  }, []);
+
+  const cycleRepeat = useCallback((): void => {
+    setRepeat((r) => {
+      const next: RepeatMode = r === 'off' ? 'all' : r === 'all' ? 'one' : 'off';
+      localStorage.setItem(REPEAT_KEY, next);
+      return next;
+    });
+  }, []);
 
   // --- Library scanning -----------------------------------------------------
   const loadSongs = useCallback(async (refresh: boolean): Promise<void> => {
@@ -55,7 +86,7 @@ export default function Home(): JSX.Element {
   }, [loadSongs]);
 
   // --- Playback controls --------------------------------------------------
-  const playSong = useCallback(
+  const playByIndex = useCallback(
     (index: number): void => {
       if (index < 0 || index >= songs.length) return;
       setCurrentIndex(index);
@@ -67,32 +98,48 @@ export default function Home(): JSX.Element {
     [songs.length],
   );
 
+  const consumeQueue = useCallback((): boolean => {
+    if (queue.length === 0) return false;
+    const [nextId, ...rest] = queue;
+    setQueue(rest);
+    const idx = songs.findIndex((s) => s.id === nextId);
+    if (idx >= 0) {
+      playByIndex(idx);
+      return true;
+    }
+    return false;
+  }, [queue, songs, playByIndex]);
+
   const handleShuffle = useCallback((): void => {
     if (songs.length === 0) return;
-    playSong(Math.floor(Math.random() * songs.length));
-  }, [songs.length, playSong]);
+    playByIndex(Math.floor(Math.random() * songs.length));
+  }, [songs.length, playByIndex]);
 
   const handlePrevious = useCallback((): void => {
     if (songs.length === 0) return;
-    playSong(currentIndex > 0 ? currentIndex - 1 : songs.length - 1);
-  }, [currentIndex, songs.length, playSong]);
+    playByIndex(currentIndex > 0 ? currentIndex - 1 : songs.length - 1);
+  }, [currentIndex, songs.length, playByIndex]);
 
   const handleNext = useCallback((): void => {
     if (songs.length === 0) return;
-    playSong(currentIndex < songs.length - 1 ? currentIndex + 1 : 0);
-  }, [currentIndex, songs.length, playSong]);
+    if (consumeQueue()) return;
+    playByIndex(currentIndex < songs.length - 1 ? currentIndex + 1 : 0);
+  }, [songs.length, currentIndex, consumeQueue, playByIndex]);
+
+  const play = useCallback((): void => {
+    audioRef.current?.play().catch(console.error);
+    setIsPlaying(true);
+  }, []);
+
+  const pause = useCallback((): void => {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+  }, []);
 
   const togglePlay = useCallback((): void => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      audio.play().catch(console.error);
-      setIsPlaying(true);
-    }
-  }, [isPlaying]);
+    if (isPlaying) pause();
+    else play();
+  }, [isPlaying, play, pause]);
 
   const handleSeek = useCallback((time: number): void => {
     const audio = audioRef.current;
@@ -105,6 +152,32 @@ export default function Home(): JSX.Element {
     if (currentSong) toggleLike(currentSong.id);
   }, [currentSong, toggleLike]);
 
+  // --- Queue mutators ---------------------------------------------------
+  const enqueue = useCallback((id: string): void => {
+    setQueue((q) => (q.includes(id) ? q : [...q, id]));
+  }, []);
+
+  const playNextInQueue = useCallback((id: string): void => {
+    setQueue((q) => [id, ...q.filter((x) => x !== id)]);
+  }, []);
+
+  const removeFromQueue = useCallback((pos: number): void => {
+    setQueue((q) => q.filter((_, i) => i !== pos));
+  }, []);
+
+  const clearQueue = useCallback((): void => setQueue([]), []);
+
+  const playFromQueue = useCallback(
+    (pos: number): void => {
+      const id = queue[pos];
+      if (!id) return;
+      const idx = songs.findIndex((s) => s.id === id);
+      setQueue((q) => q.filter((_, i) => i !== pos));
+      if (idx >= 0) playByIndex(idx);
+    },
+    [queue, songs, playByIndex],
+  );
+
   // --- Audio element wiring --------------------------------------------------
   useEffect(() => {
     const audio = audioRef.current;
@@ -116,7 +189,20 @@ export default function Home(): JSX.Element {
       setCurrentTime(audio.currentTime);
       setDuration(audio.duration || 0);
     };
-    const handleEnded = (): void => handleNext();
+
+    const handleEnded = (): void => {
+      if (repeat === 'one') {
+        audio.currentTime = 0;
+        audio.play().catch(console.error);
+        return;
+      }
+      if (consumeQueue()) return;
+      if (repeat === 'off' && currentIndex >= songs.length - 1) {
+        setIsPlaying(false);
+        return;
+      }
+      playByIndex(currentIndex < songs.length - 1 ? currentIndex + 1 : 0);
+    };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateTime);
@@ -127,7 +213,7 @@ export default function Home(): JSX.Element {
       audio.removeEventListener('loadedmetadata', updateTime);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [volume, currentIndex, handleNext]);
+  }, [volume, currentIndex, repeat, songs.length, consumeQueue, playByIndex]);
 
   // --- Discord Rich Presence ---------------------------------------------
   useEffect(() => {
@@ -173,6 +259,18 @@ export default function Home(): JSX.Element {
     };
   }, [songs, currentIndex, isPlaying, mod, rate]);
 
+  useMediaSession({
+    song: currentSong,
+    isPlaying,
+    rate,
+    audioRef,
+    onPlay: play,
+    onPause: pause,
+    onPrevious: handlePrevious,
+    onNext: handleNext,
+    onSeek: handleSeek,
+  });
+
   // --- Keyboard shortcuts -------------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -188,11 +286,15 @@ export default function Home(): JSX.Element {
         handlePrevious();
       } else if (e.key.toLowerCase() === 'l') {
         handleToggleLike();
+      } else if (e.key.toLowerCase() === 'r') {
+        cycleRepeat();
+      } else if (e.key.toLowerCase() === 's') {
+        handleShuffle();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, handleNext, handlePrevious, handleToggleLike]);
+  }, [togglePlay, handleNext, handlePrevious, handleToggleLike, cycleRepeat, handleShuffle]);
 
   const backgroundImage = currentSong
     ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/raw.jpg`
@@ -224,6 +326,8 @@ export default function Home(): JSX.Element {
                 rate={rate}
                 volume={volume}
                 mod={mod}
+                repeat={repeat}
+                queueCount={queueSongs.length}
                 audioRef={audioRef}
                 isLiked={isLiked(currentSong.id)}
                 onTogglePlay={togglePlay}
@@ -233,6 +337,7 @@ export default function Home(): JSX.Element {
                 onSeek={handleSeek}
                 onVolumeChange={setVolume}
                 onModChange={setMod}
+                onCycleRepeat={cycleRepeat}
                 onToggleLike={handleToggleLike}
               />
             )}
@@ -245,7 +350,13 @@ export default function Home(): JSX.Element {
                 currentIndex={currentIndex}
                 likedSongs={likedSongs}
                 isScanning={isScanning}
-                onSongSelect={playSong}
+                queueSongs={queueSongs}
+                onSongSelect={playByIndex}
+                onEnqueue={enqueue}
+                onPlayNext={playNextInQueue}
+                onPlayFromQueue={playFromQueue}
+                onRemoveFromQueue={removeFromQueue}
+                onClearQueue={clearQueue}
                 onClose={() => setLibraryOpen(false)}
               />
             )}
