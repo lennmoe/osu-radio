@@ -7,6 +7,8 @@ export interface Song {
   audioPath: string;
   folderPath: string;
   bpm: number;
+  /** Folder mtime in ms — used for "recently added" sorting. */
+  dateAdded: number;
 }
 
 export type PlaybackMod = 'none' | 'dt' | 'nc';
