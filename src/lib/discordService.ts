@@ -106,7 +106,7 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
   console.log('[Discord] Calculated timestamps:', { startTimestamp, endTimestamp, rate });
 
   const presence: SetActivity = {
-    details: modLabel ? `${title} +${modLabel === 'Double Time' ? 'DT' : 'NC'}` : title,
+    details: modLabel ? `${title} +DT` : title,
     state: artist,
     type: 2,
     largeImageKey: largeImageKey,
@@ -143,7 +143,7 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
 
   // Paused state doesn't show elapsed time.
   const presence: SetActivity = {
-    details: modLabel ? `${title} +${modLabel === 'Double Time' ? 'DT' : 'NC'}` : title,
+    details: modLabel ? `${title} +DT` : title,
     state: artist,
     type: 2,
     largeImageKey: largeImageKey,

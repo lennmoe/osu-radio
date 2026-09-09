@@ -44,13 +44,7 @@ export default function Home(): JSX.Element {
     ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/list@2x.jpg`
     : '';
 
-  usePlaybackMod({
-    audioRef,
-    mod,
-    isPlaying,
-    bpm: currentSong?.bpm ?? 0,
-    trackKey: currentSong?.id ?? '',
-  });
+  usePlaybackMod({ audioRef, mod, trackKey: currentSong?.id ?? '' });
   useAccentColor(coverUrl);
 
   // --- Repeat mode persistence -------------------------------------------
