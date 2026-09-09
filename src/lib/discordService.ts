@@ -41,8 +41,27 @@ export async function connectDiscord(): Promise<void> {
   }
 }
 
-export async function updateDiscordPlaying(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0): Promise<void> {
-  console.log('[Discord] updateDiscordPlaying called:', { title, artist, beatmapSetID, isConnected, hasClient: !!client });
+/**
+ * Rate-aware timestamps. `rate` > 1 (DT / NC) means the track finishes sooner in
+ * real time, so the remaining wall-clock seconds are (duration - currentTime) / rate.
+ */
+function computeTimestamps(currentTime: number, duration: number, rate: number): { startTimestamp?: number; endTimestamp?: number } {
+  const safeDuration = duration && duration > 0 ? duration : 0;
+  const safeCurrentTime = currentTime && currentTime > 0 ? currentTime : 0;
+  const safeRate = rate && rate > 0 ? rate : 1;
+
+  if (safeDuration <= 0) return {};
+
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = Math.floor((safeDuration - safeCurrentTime) / safeRate);
+  const total = Math.floor(safeDuration / safeRate);
+  const endTimestamp = now + remaining;
+
+  return { startTimestamp: endTimestamp - total, endTimestamp };
+}
+
+export async function updateDiscordPlaying(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0, rate: number = 1, modLabel: string = ''): Promise<void> {
+  console.log('[Discord] updateDiscordPlaying called:', { title, artist, beatmapSetID, isConnected, hasClient: !!client, rate, modLabel });
   
   if (!client) {
     console.warn('[Discord] Client null, attempting to connect...');
@@ -72,31 +91,19 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
     largeImageKey = 'logo';
   }
 
-  // Calculate timestamps for song progress
-  console.log('[Discord] Timestamp calculation:', { currentTime, duration });
-  
-  // Handle null/undefined values
-  const safeDuration = duration && duration > 0 ? duration : 0;
-  const safeCurrentTime = currentTime && currentTime > 0 ? currentTime : 0;
-  
-  // Only set timestamps if we have valid duration
-  let startTimestamp: number | undefined;
-  let endTimestamp: number | undefined;
-  
-  if (safeDuration > 0) {
-    endTimestamp = Math.floor(Date.now() / 1000) + Math.floor(safeDuration - safeCurrentTime);
-    startTimestamp = endTimestamp - Math.floor(safeDuration);
-  }
-  
-  console.log('[Discord] Calculated timestamps:', { startTimestamp, endTimestamp, safeDuration, safeCurrentTime });
+  // Calculate timestamps for song progress (rate-adjusted for DT / NC).
+  const { startTimestamp, endTimestamp } = computeTimestamps(currentTime, duration, rate);
+  console.log('[Discord] Calculated timestamps:', { startTimestamp, endTimestamp, rate });
 
   const presence: SetActivity = {
-    details: title,
+    details: modLabel ? `${title} +${modLabel === 'Double Time' ? 'DT' : 'NC'}` : title,
     state: artist,
     type: 2,
     largeImageKey: largeImageKey,
     buttons: [],
   };
+
+  if (modLabel) presence.largeImageText = modLabel;
 
   // Only add timestamps if they're valid
   if (startTimestamp && endTimestamp) {
@@ -116,7 +123,7 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
   console.log('[Discord] Activity set command sent');
 }
 
-export async function updateDiscordPaused(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0): Promise<void> {
+export async function updateDiscordPaused(title: string, artist: string, beatmapSetID: string, modLabel: string = ''): Promise<void> {
   if (!client) {
     console.warn('[Discord] Client null, attempting to connect...');
     await connectDiscord();
@@ -145,30 +152,13 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
     largeImageKey = 'logo';
   }
 
-  // Calculate timestamps for song progress (paused state doesn't show elapsed time)
-  console.log('[Discord] Timestamp calculation (paused):', { currentTime, duration });
-  
-  // Handle null/undefined values
-  const safeDuration = duration && duration > 0 ? duration : 0;
-  const safeCurrentTime = currentTime && currentTime > 0 ? currentTime : 0;
-  
-  // Only set timestamps if we have valid duration
-  let startTimestamp: number | undefined;
-  let endTimestamp: number | undefined;
-  
-  if (safeDuration > 0) {
-    endTimestamp = Math.floor(Date.now() / 1000) + Math.floor(safeDuration - safeCurrentTime);
-    startTimestamp = endTimestamp - Math.floor(safeDuration);
-  }
-  
-  console.log('[Discord] Calculated timestamps (paused):', { startTimestamp, endTimestamp, safeDuration, safeCurrentTime });
-
+  // Paused state doesn't show elapsed time.
   const presence: SetActivity = {
-    details: title,
+    details: modLabel ? `${title} +${modLabel === 'Double Time' ? 'DT' : 'NC'}` : title,
     state: artist,
     type: 2,
     largeImageKey: largeImageKey,
-    largeImageText: 'Paused',
+    largeImageText: modLabel ? `${modLabel} · Paused` : 'Paused',
     buttons: [],
   };
 
