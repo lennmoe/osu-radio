@@ -6,4 +6,5 @@ export interface Song {
   creator: string;
   audioPath: string;
   folderPath: string;
+  bpm: number;
 }

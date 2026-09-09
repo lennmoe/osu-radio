@@ -2,7 +2,33 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Song } from '@/types';
 
-export async function scanOsuFolder(osuPath: string): Promise<Song[]> {
+export const OSU_PATH = process.env.OSU_PATH || 'C:/Osu!';
+
+/** Read the first uninherited timing point to derive the map BPM. */
+function parseBpm(content: string): number {
+  const lines = content.split('\n');
+  let inTimingPoints = false;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith('[')) {
+      inTimingPoints = line === '[TimingPoints]';
+      continue;
+    }
+    if (!inTimingPoints || !line) continue;
+
+    const parts = line.split(',');
+    const beatLength = parseFloat(parts[1]);
+    // Uninherited timing points have a positive beatLength (ms per beat).
+    if (Number.isFinite(beatLength) && beatLength > 0) {
+      return Math.round(60000 / beatLength);
+    }
+  }
+
+  return 0;
+}
+
+export async function scanOsuFolder(osuPath: string = OSU_PATH): Promise<Song[]> {
   const songs: Song[] = [];
   const songsPath = path.join(osuPath, 'Songs');
 
@@ -47,11 +73,13 @@ export async function scanOsuFolder(osuPath: string): Promise<Song[]> {
         creator,
         audioPath: path.join(folderPath, audioFile),
         folderPath,
+        bpm: parseBpm(content),
       });
     }
   } catch (error) {
     console.error('Error scanning osu folder:', error);
   }
 
+  songs.sort((a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title));
   return songs;
 }
