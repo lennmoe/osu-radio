@@ -10,7 +10,7 @@ interface AudioVisualizerProps {
 export function AudioVisualizer({ audioRef, isPlaying }: AudioVisualizerProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const dataArrayRef = useRef<any>(null);
   const animationIdRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
