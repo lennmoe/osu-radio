@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { IoRefresh, IoLibrary } from 'react-icons/io5';
 
@@ -11,7 +12,7 @@ interface TopBarProps {
   onToggleLibrary: () => void;
 }
 
-export function TopBar({ songCount, isScanning, libraryOpen, onRescan, onToggleLibrary }: TopBarProps): JSX.Element {
+function TopBarComponent({ songCount, isScanning, libraryOpen, onRescan, onToggleLibrary }: TopBarProps): JSX.Element {
   return (
     <motion.header
       initial={{ y: -40, opacity: 0 }}
@@ -48,3 +49,5 @@ export function TopBar({ songCount, isScanning, libraryOpen, onRescan, onToggleL
     </motion.header>
   );
 }
+
+export const TopBar = memo(TopBarComponent);

@@ -48,6 +48,12 @@
 }
 
 @layer components {
+  /* Skip layout/paint for off-screen library rows (huge lists stay smooth). */
+  .lib-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 60px;
+  }
+
   /* Shared thin slider used by the seek + volume controls. */
   .radio-range {
     -webkit-appearance: none;

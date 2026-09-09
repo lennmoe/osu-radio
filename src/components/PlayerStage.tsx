@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Song } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BiMusic } from 'react-icons/bi';
@@ -12,7 +13,7 @@ interface PlayerStageProps {
   isPlaying: boolean;
 }
 
-export function PlayerStage({ currentSong, isPlaying }: PlayerStageProps): JSX.Element {
+function PlayerStageComponent({ currentSong, isPlaying }: PlayerStageProps): JSX.Element {
   if (!currentSong) {
     return (
       <div className="flex flex-col items-center gap-5 text-white/50">
@@ -79,3 +80,5 @@ export function PlayerStage({ currentSong, isPlaying }: PlayerStageProps): JSX.E
     </div>
   );
 }
+
+export const PlayerStage = memo(PlayerStageComponent);

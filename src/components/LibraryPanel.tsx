@@ -1,7 +1,7 @@
 'use client';
 
 import { Song, SortKey, SORT_LABEL } from '@/types';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BiSearch, BiMusic } from 'react-icons/bi';
 import {
@@ -35,6 +35,82 @@ interface LibraryPanelProps {
   onClose: () => void;
 }
 
+function Cover({ song, size }: { song: Song; size: string }): JSX.Element {
+  return (
+    <img
+      src={`https://assets.ppy.sh/beatmaps/${song.beatmapSetID}/covers/list.jpg`}
+      alt=""
+      loading="lazy"
+      onError={(e) => {
+        e.currentTarget.src = FALLBACK_COVER;
+      }}
+      className={`${size} rounded-md object-cover flex-shrink-0`}
+    />
+  );
+}
+
+interface SongRowProps {
+  song: Song;
+  index: number;
+  isActive: boolean;
+  showBpm: boolean;
+  onSelect: (index: number) => void;
+  onEnqueue: (id: string) => void;
+  onPlayNext: (id: string) => void;
+}
+
+const SongRow = memo(function SongRow({
+  song,
+  index,
+  isActive,
+  showBpm,
+  onSelect,
+  onEnqueue,
+  onPlayNext,
+}: SongRowProps): JSX.Element {
+  return (
+    <div
+      onClick={() => onSelect(index)}
+      className={`lib-row w-full text-left p-2 rounded-lg transition flex items-center gap-3 group cursor-pointer ${
+        isActive ? 'bg-primary/20 ring-1 ring-primary/40' : 'hover:bg-white/5'
+      }`}
+    >
+      <Cover song={song} size="w-11 h-11" />
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}>
+          {song.title}
+        </div>
+        <div className="text-xs text-white/50 truncate">
+          {song.artist}
+          {showBpm && song.bpm > 0 && <span className="text-white/30"> · {song.bpm} BPM</span>}
+        </div>
+      </div>
+      <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlayNext(song.id);
+          }}
+          title="Play next"
+          className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/15"
+        >
+          <IoPlayForwardOutline className="w-4 h-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEnqueue(song.id);
+          }}
+          title="Add to queue"
+          className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/15"
+        >
+          <IoAddOutline className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
 function sortSongs(list: Song[], key: SortKey): Song[] {
   const copy = [...list];
   copy.sort((a, b) => {
@@ -52,7 +128,7 @@ function sortSongs(list: Song[], key: SortKey): Song[] {
   return copy;
 }
 
-export function LibraryPanel({
+function LibraryPanelComponent({
   songs,
   currentIndex,
   likedSongs,
@@ -80,6 +156,14 @@ export function LibraryPanel({
     localStorage.setItem(SORT_KEY, key);
   };
 
+  const indexById = useMemo(() => {
+    const m = new Map<string, number>();
+    songs.forEach((s, i) => m.set(s.id, i));
+    return m;
+  }, [songs]);
+
+  const currentId = songs[currentIndex]?.id;
+
   const displaySongs = useMemo(() => {
     const base = tab === 'liked' ? songs.filter((s) => likedSongs.has(s.id)) : songs;
     const q = query.trim().toLowerCase();
@@ -93,42 +177,6 @@ export function LibraryPanel({
       : base;
     return sortSongs(filtered, sortKey);
   }, [songs, likedSongs, tab, query, sortKey]);
-
-  const rowActions = (song: Song) => (
-    <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlayNext(song.id);
-        }}
-        title="Play next"
-        className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/15"
-      >
-        <IoPlayForwardOutline className="w-4 h-4" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onEnqueue(song.id);
-        }}
-        title="Add to queue"
-        className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/15"
-      >
-        <IoAddOutline className="w-4 h-4" />
-      </button>
-    </div>
-  );
-
-  const cover = (song: Song, size: string) => (
-    <img
-      src={`https://assets.ppy.sh/beatmaps/${song.beatmapSetID}/covers/list.jpg`}
-      alt=""
-      onError={(e) => {
-        e.currentTarget.src = FALLBACK_COVER;
-      }}
-      className={`${size} rounded-md object-cover flex-shrink-0`}
-    />
-  );
 
   return (
     <motion.aside
@@ -221,10 +269,10 @@ export function LibraryPanel({
                 <div
                   key={`${song.id}-${pos}`}
                   onClick={() => onPlayFromQueue(pos)}
-                  className="w-full text-left p-2 rounded-lg transition flex items-center gap-3 hover:bg-white/5 group cursor-pointer"
+                  className="lib-row w-full text-left p-2 rounded-lg transition flex items-center gap-3 hover:bg-white/5 group cursor-pointer"
                 >
                   <span className="text-xs text-white/30 w-4 text-center tabular-nums">{pos + 1}</span>
-                  {cover(song, 'w-9 h-9')}
+                  <Cover song={song} size="w-9 h-9" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate text-white">{song.title}</div>
                     <div className="text-xs text-white/50 truncate">{song.artist}</div>
@@ -256,38 +304,23 @@ export function LibraryPanel({
           </div>
         ) : (
           <div className="p-2 space-y-0.5">
-            {displaySongs.map((song) => {
-              const actualIndex = songs.indexOf(song);
-              const isActive = actualIndex === currentIndex;
-              return (
-                <div
-                  key={song.id}
-                  onClick={() => onSongSelect(actualIndex)}
-                  className={`w-full text-left p-2 rounded-lg transition flex items-center gap-3 group cursor-pointer ${
-                    isActive ? 'bg-primary/20 ring-1 ring-primary/40' : 'hover:bg-white/5'
-                  }`}
-                >
-                  {cover(song, 'w-11 h-11')}
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}
-                    >
-                      {song.title}
-                    </div>
-                    <div className="text-xs text-white/50 truncate">
-                      {song.artist}
-                      {sortKey === 'bpm' && song.bpm > 0 && (
-                        <span className="text-white/30"> · {song.bpm} BPM</span>
-                      )}
-                    </div>
-                  </div>
-                  {rowActions(song)}
-                </div>
-              );
-            })}
+            {displaySongs.map((song) => (
+              <SongRow
+                key={song.id}
+                song={song}
+                index={indexById.get(song.id) ?? -1}
+                isActive={song.id === currentId}
+                showBpm={sortKey === 'bpm'}
+                onSelect={onSongSelect}
+                onEnqueue={onEnqueue}
+                onPlayNext={onPlayNext}
+              />
+            ))}
           </div>
         )}
       </div>
     </motion.aside>
   );
 }
+
+export const LibraryPanel = memo(LibraryPanelComponent);
