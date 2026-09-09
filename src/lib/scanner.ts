@@ -74,6 +74,7 @@ export async function scanOsuFolder(osuPath: string = OSU_PATH): Promise<Song[]>
         audioPath: path.join(folderPath, audioFile),
         folderPath,
         bpm: parseBpm(content),
+        dateAdded: stats.mtimeMs,
       });
     }
   } catch (error) {
