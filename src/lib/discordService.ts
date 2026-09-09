@@ -113,7 +113,7 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
     buttons: [],
   };
 
-  if (modLabel) presence.largeImageText = modLabel;
+ // if (modLabel) presence.largeImageText = modLabel;
 
   // Only add timestamps if they're valid
   if (startTimestamp && endTimestamp) {
@@ -143,7 +143,7 @@ export async function updateDiscordPaused(title: string, artist: string, beatmap
 
   // Paused state doesn't show elapsed time.
   const presence: SetActivity = {
-    details: modLabel ? `${title} +DT` : title,
+   // details: modLabel ? `${title} +DT` : title,
     state: artist,
     type: 2,
     largeImageKey: largeImageKey,
