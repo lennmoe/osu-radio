@@ -11,7 +11,7 @@ export interface Song {
   dateAdded: number;
 }
 
-export type PlaybackMod = 'none' | 'dt' | 'nc';
+export type PlaybackMod = 'none' | 'dt';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -27,11 +27,9 @@ export const SORT_LABEL: Record<SortKey, string> = {
 export const MOD_RATE: Record<PlaybackMod, number> = {
   none: 1,
   dt: 1.5,
-  nc: 1.5,
 };
 
 export const MOD_LABEL: Record<PlaybackMod, string> = {
   none: '',
   dt: 'Double Time',
-  nc: 'Nightcore',
 };
