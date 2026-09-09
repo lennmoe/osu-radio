@@ -85,6 +85,10 @@ export default function Home(): JSX.Element {
     void loadSongs(false);
   }, [loadSongs]);
 
+  const rescan = useCallback(() => void loadSongs(true), [loadSongs]);
+  const toggleLibrary = useCallback(() => setLibraryOpen((v) => !v), []);
+  const closeLibrary = useCallback(() => setLibraryOpen(false), []);
+
   // --- Playback controls --------------------------------------------------
   const playByIndex = useCallback(
     (index: number): void => {
@@ -309,8 +313,8 @@ export default function Home(): JSX.Element {
           songCount={songs.length}
           isScanning={isScanning}
           libraryOpen={libraryOpen}
-          onRescan={() => void loadSongs(true)}
-          onToggleLibrary={() => setLibraryOpen((v) => !v)}
+          onRescan={rescan}
+          onToggleLibrary={toggleLibrary}
         />
 
         <div className="flex-1 flex min-h-0">
@@ -357,7 +361,7 @@ export default function Home(): JSX.Element {
                 onPlayFromQueue={playFromQueue}
                 onRemoveFromQueue={removeFromQueue}
                 onClearQueue={clearQueue}
-                onClose={() => setLibraryOpen(false)}
+                onClose={closeLibrary}
               />
             )}
           </AnimatePresence>
