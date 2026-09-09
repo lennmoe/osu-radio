@@ -27,7 +27,8 @@ export function usePlaybackMod({ audioRef, mod, isPlaying, bpm, trackKey }: Opti
     if (!audio) return;
 
     const rate = MOD_RATE[mod];
-    const keepPitch = mod === 'none';
+    // Only Nightcore shifts the pitch up; DT is a plain tempo speed-up.
+    const keepPitch = mod !== 'nc';
 
     const apply = (): void => {
       audio.playbackRate = rate;
@@ -41,18 +42,19 @@ export function usePlaybackMod({ audioRef, mod, isPlaying, bpm, trackKey }: Opti
     return () => audio.removeEventListener('loadedmetadata', apply);
   }, [audioRef, mod, trackKey]);
 
-  // Nightcore beat layer.
+  // Nightcore beat layer — runs only for NC while playing.
   useEffect(() => {
-    const effectiveBpm = (bpm > 0 ? bpm : 180) * MOD_RATE[mod];
-
     if (mod !== 'nc' || !isPlaying) {
       beatRef.current?.stop();
       return;
     }
 
+    const effectiveBpm = (bpm > 0 ? bpm : 180) * MOD_RATE.nc;
     if (!beatRef.current) beatRef.current = new NightcoreBeat(effectiveBpm);
     beatRef.current.setBpm(effectiveBpm);
     beatRef.current.start();
+
+    return () => beatRef.current?.stop();
   }, [mod, isPlaying, bpm]);
 
   useEffect(() => () => beatRef.current?.stop(), []);
