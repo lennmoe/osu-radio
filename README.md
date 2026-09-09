@@ -1,138 +1,101 @@
-# osu! Radio
+# osu!radio
 
-A modern music player for your osu! beatmap collection with Discord Rich Presence integration.
+A music player for your osu! beatmap collection — Discord Rich Presence, OS media
+keys, a play queue, speed mods and a UI that tints itself to the current map.
 
 ## Features
 
-- Play music from your osu! beatmap collection
-- Real-time search with autocomplete
-- Volume control with visual slider
-- Discord Rich Presence integration
-- Progress bar with timestamps
-- Beatmap cover images display
+- **Auto-scan on launch** — reads your osu! `Songs` folder on startup and caches
+  the result; a rescan button lives in the top bar
+- **Library** — search by title / artist / mapper, sort by Artist, Title, BPM or
+  Newest (folder date), All / Liked / Queue tabs
+- **Play queue** — hover a track to *Play next* or *Add to queue*; the queue is
+  consumed before linear playback
+- **Repeat modes** — off / all / one (persisted)
+- **Speed mod** — `DT` plays at 1.5x with the pitch preserved (plain tempo
+  speed-up); `1.0x` is normal
+- **Discord Rich Presence** — title, artist, cover, map button and a progress bar
+  whose timestamps follow the playback rate (DT finishes sooner)
+- **OS media integration** — hardware media keys and the Windows / macOS
+  "now playing" overlay via the Media Session API
+- **Dynamic accent colour** — a vivid colour is pulled from the cover art and
+  drives the whole UI theme
+- **Blurred beatmap background** — the map's raw background image, full-bleed
+- **Likes**, **shuffle**, seekable progress bar (HTTP Range), keyboard shortcuts
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `Space` | Play / pause |
+| `←` / `→` | Previous / next track |
+| `S` | Shuffle |
+| `R` | Cycle repeat mode |
+| `L` | Like / unlike current track |
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) (JavaScript runtime)
-- [Discord Desktop](https://discord.com/download) (for Rich Presence)
+- [Bun](https://bun.sh/) (or Node 18+)
 - osu! installed with beatmaps
+- [Discord Desktop](https://discord.com/download) — optional, for Rich Presence
 
 ## Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone this repository
-   cd "osu radio"
-   ```
+```bash
+git clone https://github.com/L3ne/osu-radio.git
+cd osu-radio
+bun install
+```
 
-2. **Install dependencies**
-   ```bash
-   bun install
-   ```
+Create a `.env` file:
 
-3. **Configure environment variables**
-   
-   Copy the example env file:
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and set your values:
-   ```env
-   DISCORD_CLIENT_ID=your_discord_client_id
-   DISCORD_SHOW_BUTTONS=true
-   ```
+```env
+# Path to your osu! install (the folder containing "Songs"). Defaults to C:/Osu!
+OSU_PATH=C:/Osu!
 
-4. **Configure osu! path**
-   
-   Edit `src/app/api/scan/route.ts` and change the osu! path:
-   ```typescript
-   const songs = await scanOsuFolder('D:/Osu!'); // Change this to your osu! path
-   ```
-
-## Discord Rich Presence Setup
-
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application
-3. Copy the **Application ID**
-4. Paste it in your `.env` file as `DISCORD_CLIENT_ID`
-5. (Optional) Upload a logo image named `logo` in the Rich Presence assets
+# Discord application id — only needed for Rich Presence
+DISCORD_CLIENT_ID=your_discord_client_id
+```
 
 ## Usage
 
-1. **Start the development server**
-   ```bash
-   bun run dev
-   ```
-
-2. **Open your browser**
-   
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-3. **Scan your beatmaps**
-   
-   Click the "Scan osu! Folder" button to load your songs
-
-4. **Play music**
-   
-   - Click on any song to play it
-   - Use the search bar to find songs quickly
-   - Adjust volume with the slider
-   - Your Discord status will update automatically
-
-## Configuration
-
-### Environment Variables
-
-- `DISCORD_CLIENT_ID`: Your Discord application ID
-- `DISCORD_SHOW_BUTTONS`: Show/hide Discord RPC buttons (`true` or `false`)
-
-### Customization
-
-**Change osu! folder path:**
-Edit `src/app/api/scan/route.ts`:
-```typescript
-const songs = await scanOsuFolder('YOUR_OSU_PATH');
-```
-
-**Change Discord RPC idle status:**
-Edit `src/lib/discordService.ts`:
-```typescript
-details: 'Your custom message',
-```
-
-### Discord RPC not working
-
-1. Make sure Discord Desktop is running
-2. Check that your `DISCORD_CLIENT_ID` is correct
-3. Verify that the application exists in Discord Developer Portal
-4. Check terminal logs for connection errors
-
-### Songs not loading
-
-1. Verify your osu! path is correct in `src/app/api/scan/route.ts`
-2. Make sure you have beatmaps in your Songs folder
-3. Check that beatmaps have valid `.osu` files
-
-### Audio not playing
-
-1. Check browser console for errors
-2. Verify the audio file path is accessible
-3. Try a different song
-
-## Development
-
-**Run development server:**
 ```bash
 bun run dev
 ```
 
-**Build for production:**
+Open [http://localhost:3000](http://localhost:3000). The library scans itself on
+first load — pick a track to start. Use the rescan button in the top bar after
+adding new beatmaps.
+
+## Discord Rich Presence setup
+
+1. Create an application at the
+   [Discord Developer Portal](https://discord.com/developers/applications)
+2. Copy the **Application ID** into `.env` as `DISCORD_CLIENT_ID`
+3. (Optional) upload a Rich Presence asset named `logo` for the idle image
+4. Keep Discord Desktop running
+
+## Troubleshooting
+
+**Songs not loading** — check `OSU_PATH` points at the folder that contains
+`Songs`, and that beatmaps have valid `.osu` files.
+
+**Discord presence not updating** — make sure Discord Desktop is running and
+`DISCORD_CLIENT_ID` matches an existing application; check the terminal logs.
+
+**Audio won't seek** — the dev server must serve Range requests (it does by
+default); a hard refresh usually clears a stuck `<audio>` element.
+
+## Development
+
 ```bash
-bun run build
+bun run dev      # dev server
+bun run build    # production build
+bun run start    # production server
+bun run lint     # eslint
 ```
 
-**Start production server:**
-```bash
-bun start
-```
+## Tech
+
+Next.js 14 (App Router) · React 18 · TypeScript · Tailwind CSS · framer-motion ·
+`@xhayper/discord-rpc`
