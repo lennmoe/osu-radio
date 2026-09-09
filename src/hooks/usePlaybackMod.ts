@@ -27,14 +27,13 @@ export function usePlaybackMod({ audioRef, mod, isPlaying, bpm, trackKey }: Opti
     if (!audio) return;
 
     const rate = MOD_RATE[mod];
-    // Only Nightcore shifts the pitch up; DT is a plain tempo speed-up.
-    const keepPitch = mod !== 'nc';
-
+    // Both DT and NC are plain tempo speed-ups — pitch is always preserved.
+    // NC differs only by the synthesised beat layered on below.
     const apply = (): void => {
       audio.playbackRate = rate;
-      audio.preservesPitch = keepPitch;
-      (audio as unknown as { mozPreservesPitch?: boolean }).mozPreservesPitch = keepPitch;
-      (audio as unknown as { webkitPreservesPitch?: boolean }).webkitPreservesPitch = keepPitch;
+      audio.preservesPitch = true;
+      (audio as unknown as { mozPreservesPitch?: boolean }).mozPreservesPitch = true;
+      (audio as unknown as { webkitPreservesPitch?: boolean }).webkitPreservesPitch = true;
     };
 
     apply();

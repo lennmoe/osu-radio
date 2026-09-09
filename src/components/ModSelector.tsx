@@ -10,8 +10,8 @@ interface ModSelectorProps {
 
 const OPTIONS: { value: PlaybackMod; label: string; hint: string }[] = [
   { value: 'none', label: '1.0x', hint: 'Normal speed' },
-  { value: 'dt', label: 'DT', hint: 'Double Time · 1.5x, same pitch' },
-  { value: 'nc', label: 'NC', hint: 'Nightcore · 1.5x, pitch up + beat' },
+  { value: 'dt', label: 'DT', hint: 'Double Time · 1.5x' },
+  { value: 'nc', label: 'NC', hint: 'Nightcore · 1.5x + beat' },
 ];
 
 export function ModSelector({ mod, onChange }: ModSelectorProps): JSX.Element {
