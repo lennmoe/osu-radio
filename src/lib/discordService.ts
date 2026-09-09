@@ -41,6 +41,39 @@ export async function connectDiscord(): Promise<void> {
   }
 }
 
+const IDLE_KEY = 'logo';
+
+// Resolved cover keys per beatmapSetID, so we don't HEAD assets.ppy.sh on
+// every presence update (that round-trip was the RPC lag on track changes).
+const coverKeyCache = new Map<string, string>();
+
+async function resolveCoverKey(beatmapSetID: string): Promise<string> {
+  if (!beatmapSetID) return IDLE_KEY;
+  const cached = coverKeyCache.get(beatmapSetID);
+  if (cached) return cached;
+
+  const url = `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`;
+  let key = url;
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    if (res.status === 404) key = IDLE_KEY;
+  } catch {
+    key = IDLE_KEY;
+  }
+  coverKeyCache.set(beatmapSetID, key);
+  return key;
+}
+
+async function ensureConnected(): Promise<boolean> {
+  if (!client) await connectDiscord();
+  let attempts = 0;
+  while (!isConnected && attempts < 10) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    attempts++;
+  }
+  return isConnected;
+}
+
 /**
  * Rate-aware timestamps. `rate` > 1 (DT / NC) means the track finishes sooner in
  * real time, so the remaining wall-clock seconds are (duration - currentTime) / rate.
@@ -61,35 +94,12 @@ function computeTimestamps(currentTime: number, duration: number, rate: number):
 }
 
 export async function updateDiscordPlaying(title: string, artist: string, beatmapSetID: string, currentTime: number = 0, duration: number = 0, rate: number = 1, modLabel: string = ''): Promise<void> {
-  console.log('[Discord] updateDiscordPlaying called:', { title, artist, beatmapSetID, isConnected, hasClient: !!client, rate, modLabel });
-  
-  if (!client) {
-    console.warn('[Discord] Client null, attempting to connect...');
-    await connectDiscord();
-  }
-  
-  if (!isConnected) {
-    console.warn('[Discord] Not connected, waiting for connection...');
-    let attempts = 0;
-    while (!isConnected && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      attempts++;
-    }
-    if (!isConnected) {
-      console.error('[Discord] Failed to connect after 10 attempts');
-      return;
-    }
+  if (!(await ensureConnected())) {
+    console.error('[Discord] Not connected, skipping update');
+    return;
   }
 
-  const response = await fetch(
-    `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`,
-    { method: 'HEAD' }
-  );
-
-  let largeImageKey = `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`;
-  if (response.status === 404) {
-    largeImageKey = 'logo';
-  }
+  const largeImageKey = await resolveCoverKey(beatmapSetID);
 
   // Calculate timestamps for song progress (rate-adjusted for DT / NC).
   const { startTimestamp, endTimestamp } = computeTimestamps(currentTime, duration, rate);
@@ -124,33 +134,12 @@ export async function updateDiscordPlaying(title: string, artist: string, beatma
 }
 
 export async function updateDiscordPaused(title: string, artist: string, beatmapSetID: string, modLabel: string = ''): Promise<void> {
-  if (!client) {
-    console.warn('[Discord] Client null, attempting to connect...');
-    await connectDiscord();
-  }
-  
-  if (!isConnected) {
-    console.warn('[Discord] Not connected, waiting for connection...');
-    let attempts = 0;
-    while (!isConnected && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      attempts++;
-    }
-    if (!isConnected) {
-      console.error('[Discord] Failed to connect after 10 attempts');
-      return;
-    }
+  if (!(await ensureConnected())) {
+    console.error('[Discord] Not connected, skipping update');
+    return;
   }
 
-  const response = await fetch(
-    `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`,
-    { method: 'HEAD' }
-  );
-
-  let largeImageKey = `https://assets.ppy.sh/beatmaps/${beatmapSetID}/covers/list@2x.jpg`;
-  if (response.status === 404) {
-    largeImageKey = 'logo';
-  }
+  const largeImageKey = await resolveCoverKey(beatmapSetID);
 
   // Paused state doesn't show elapsed time.
   const presence: SetActivity = {

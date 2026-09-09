@@ -219,16 +219,15 @@ export default function Home(): JSX.Element {
     };
   }, [volume, currentIndex, repeat, songs.length, consumeQueue, playByIndex]);
 
-  // --- Discord Rich Presence ---------------------------------------------
+  // --- Discord Rich Presence -------------------------------------------
+  // Debounced so rapid track-skipping only sends the final state. Re-runs
+  // once `duration` lands (0 -> N) so the presence gets a progress bar.
   useEffect(() => {
     const song = songs[currentIndex];
     const audio = audioRef.current;
     if (!song || !audio) return;
 
-    let cancelled = false;
-
-    const push = (): void => {
-      if (cancelled) return;
+    const timer = setTimeout(() => {
       fetch('/api/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,27 +240,10 @@ export default function Home(): JSX.Element {
           modLabel: MOD_LABEL[mod],
         }),
       }).catch(console.error);
-    };
+    }, 300);
 
-    if (audio.duration > 0) {
-      push();
-      return;
-    }
-
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts += 1;
-      if (audio.duration > 0 || attempts >= 10) {
-        clearInterval(interval);
-        push();
-      }
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [songs, currentIndex, isPlaying, mod, rate]);
+    return () => clearTimeout(timer);
+  }, [songs, currentIndex, isPlaying, mod, rate, duration]);
 
   useMediaSession({
     song: currentSong,
