@@ -8,3 +8,17 @@ export interface Song {
   folderPath: string;
   bpm: number;
 }
+
+export type PlaybackMod = 'none' | 'dt' | 'nc';
+
+export const MOD_RATE: Record<PlaybackMod, number> = {
+  none: 1,
+  dt: 1.5,
+  nc: 1.5,
+};
+
+export const MOD_LABEL: Record<PlaybackMod, string> = {
+  none: '',
+  dt: 'Double Time',
+  nc: 'Nightcore',
+};
