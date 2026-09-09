@@ -282,13 +282,9 @@ export default function Home(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey);
   }, [togglePlay, handleNext, handlePrevious, handleToggleLike, cycleRepeat, handleShuffle]);
 
-  const backgroundImage = currentSong
-    ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/raw.jpg`
-    : '';
-
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {backgroundImage && <AnimatedBackground imageUrl={backgroundImage} />}
+      {currentSong && <AnimatedBackground beatmapSetID={currentSong.beatmapSetID} />}
 
       <div className="relative z-10 flex flex-col h-full">
         <TopBar
