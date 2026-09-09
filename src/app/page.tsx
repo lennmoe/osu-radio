@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Song } from '@/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { MOD_LABEL, MOD_RATE, PlaybackMod, Song } from '@/types';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
-import { SongSidebar } from '@/components/SongSidebar';
-import { MediaPlayer } from '@/components/MediaPlayer';
-import { NowPlaying } from '@/components/NowPlaying';
+import { TopBar } from '@/components/TopBar';
+import { PlayerStage } from '@/components/PlayerStage';
+import { PlayerControls } from '@/components/PlayerControls';
+import { LibraryPanel } from '@/components/LibraryPanel';
 import { useLikes } from '@/hooks/useLikes';
+import { usePlaybackMod } from '@/hooks/usePlaybackMod';
 
 export default function Home(): JSX.Element {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -14,50 +17,95 @@ export default function Home(): JSX.Element {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [volume, setVolume] = useState(0.7);
+  const [mod, setMod] = useState<PlaybackMod>('none');
+  const [isScanning, setIsScanning] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(true);
+
   const audioRef = useRef<HTMLAudioElement>(null);
-  const lastDiscordUpdate = useRef<{ title: string; artist: string; isPlaying: boolean } | null>(null);
-  const discordUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
   const { likedSongs, toggleLike, isLiked } = useLikes();
 
   const currentSong = songs[currentIndex];
+  const rate = MOD_RATE[mod];
 
-  const playSong = useCallback((index: number): void => {
-    if (index < 0 || index >= songs.length) return;
-    
-    // Reset Discord update tracking when manually selecting a new song
-    lastDiscordUpdate.current = null;
-    
-    setCurrentIndex(index);
-    setIsPlaying(true);
-    setTimeout(() => {
-      audioRef.current?.play().catch(console.error);
-    }, 100);
-  }, [songs.length]);
+  usePlaybackMod({
+    audioRef,
+    mod,
+    isPlaying,
+    bpm: currentSong?.bpm ?? 0,
+    trackKey: currentSong?.id ?? '',
+  });
+
+  // --- Library scanning -----------------------------------------------------
+  const loadSongs = useCallback(async (refresh: boolean): Promise<void> => {
+    setIsScanning(true);
+    try {
+      const res = await fetch(`/api/scan${refresh ? '?refresh=1' : ''}`);
+      const data = await res.json();
+      if (data.success) setSongs(data.songs as Song[]);
+    } catch (error) {
+      console.error('[App] scan failed', error);
+    } finally {
+      setIsScanning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSongs(false);
+  }, [loadSongs]);
+
+  // --- Playback controls --------------------------------------------------
+  const playSong = useCallback(
+    (index: number): void => {
+      if (index < 0 || index >= songs.length) return;
+      setCurrentIndex(index);
+      setIsPlaying(true);
+      setTimeout(() => {
+        audioRef.current?.play().catch(console.error);
+      }, 100);
+    },
+    [songs.length],
+  );
 
   const handleShuffle = useCallback((): void => {
     if (songs.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * songs.length);
-    playSong(randomIndex);
+    playSong(Math.floor(Math.random() * songs.length));
   }, [songs.length, playSong]);
 
-  const handleToggleLike = useCallback((): void => {
-    if (currentSong) {
-      toggleLike(currentSong.id);
-    }
-  }, [currentSong, toggleLike]);
-
   const handlePrevious = useCallback((): void => {
-    const newIndex = currentIndex > 0 ? currentIndex - 1 : songs.length - 1;
-    playSong(newIndex);
+    if (songs.length === 0) return;
+    playSong(currentIndex > 0 ? currentIndex - 1 : songs.length - 1);
   }, [currentIndex, songs.length, playSong]);
 
   const handleNext = useCallback((): void => {
-    const newIndex = currentIndex < songs.length - 1 ? currentIndex + 1 : 0;
-    playSong(newIndex);
+    if (songs.length === 0) return;
+    playSong(currentIndex < songs.length - 1 ? currentIndex + 1 : 0);
   }, [currentIndex, songs.length, playSong]);
 
+  const togglePlay = useCallback((): void => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().catch(console.error);
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
+
+  const handleSeek = useCallback((time: number): void => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = time;
+    setCurrentTime(time);
+  }, []);
+
+  const handleToggleLike = useCallback((): void => {
+    if (currentSong) toggleLike(currentSong.id);
+  }, [currentSong, toggleLike]);
+
+  // --- Audio element wiring --------------------------------------------------
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -68,10 +116,7 @@ export default function Home(): JSX.Element {
       setCurrentTime(audio.currentTime);
       setDuration(audio.duration || 0);
     };
-
-    const handleEnded = (): void => {
-      handleNext();
-    };
+    const handleEnded = (): void => handleNext();
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateTime);
@@ -82,125 +127,129 @@ export default function Home(): JSX.Element {
       audio.removeEventListener('loadedmetadata', updateTime);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [volume, currentIndex, songs.length]);
+  }, [volume, currentIndex, handleNext]);
 
-  // Update Discord RPC when song changes or play state changes
+  // --- Discord Rich Presence ---------------------------------------------
   useEffect(() => {
     const song = songs[currentIndex];
-    if (!song) return;
-
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!song || !audio) return;
 
-    // Wait for audio metadata to load with timeout
-    const updateDiscord = () => {
-      const currentPos = audio.currentTime;
-      const totalDuration = audio.duration;
+    let cancelled = false;
 
-      console.log('[App] Discord update:', { currentPos, totalDuration, isPlaying });
-
+    const push = (): void => {
+      if (cancelled) return;
       fetch('/api/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ song, isPlaying, currentTime: currentPos, duration: totalDuration }),
+        body: JSON.stringify({
+          song,
+          isPlaying,
+          currentTime: audio.currentTime,
+          duration: audio.duration,
+          rate,
+          modLabel: MOD_LABEL[mod],
+        }),
       }).catch(console.error);
     };
 
-    // Try immediately if duration is available
     if (audio.duration > 0) {
-      updateDiscord();
-    } else {
-      // Wait for metadata with timeout
-      let attempts = 0;
-      const maxAttempts = 10;
-      const checkInterval = setInterval(() => {
-        attempts++;
-        console.log(`[App] Checking audio metadata (attempt ${attempts}):`, audio.duration);
-        
-        if (audio.duration > 0 || attempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          updateDiscord();
-        }
-      }, 500);
+      push();
+      return;
     }
-  }, [songs, currentIndex, isPlaying]);
 
-  const handleScan = async (): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/scan', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setSongs(data.songs);
-        console.warn(`[App] Loaded ${data.songs.length} songs`);
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      if (audio.duration > 0 || attempts >= 10) {
+        clearInterval(interval);
+        push();
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    }, 500);
 
-  const togglePlay = useCallback((): void => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [songs, currentIndex, isPlaying, mod, rate]);
 
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      audio.play().catch(console.error);
-    }
-    setIsPlaying(!isPlaying);
-  }, [isPlaying]);
+  // --- Keyboard shortcuts -------------------------------------------------
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-  const handleSeek = useCallback((time: number): void => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = time;
-    setCurrentTime(time);
-  }, []);
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowRight') {
+        handleNext();
+      } else if (e.code === 'ArrowLeft') {
+        handlePrevious();
+      } else if (e.key.toLowerCase() === 'l') {
+        handleToggleLike();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [togglePlay, handleNext, handlePrevious, handleToggleLike]);
 
-  const handleVolumeChange = useCallback((newVolume: number): void => {
-    setVolume(newVolume);
-  }, []);
-
-  const backgroundImage = currentSong 
-    ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/raw.jpg` 
+  const backgroundImage = currentSong
+    ? `https://assets.ppy.sh/beatmaps/${currentSong.beatmapSetID}/covers/raw.jpg`
     : '';
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
       {backgroundImage && <AnimatedBackground imageUrl={backgroundImage} />}
 
-      <div className="relative z-10 flex w-full">
-        <SongSidebar
-          songs={songs}
-          currentIndex={currentIndex}
-          onSongSelect={playSong}
-          isLoading={isLoading}
-          onScan={handleScan}
-          likedSongs={likedSongs}
-          onShuffle={handleShuffle}
+      <div className="relative z-10 flex flex-col h-full">
+        <TopBar
+          songCount={songs.length}
+          isScanning={isScanning}
+          libraryOpen={libraryOpen}
+          onRescan={() => void loadSongs(true)}
+          onToggleLibrary={() => setLibraryOpen((v) => !v)}
         />
 
-        <div className="flex-1 flex flex-col min-h-0">
-          <NowPlaying currentSong={currentSong} />
+        <div className="flex-1 flex min-h-0">
+          <main className="flex-1 flex flex-col items-center justify-center gap-10 px-8 min-w-0">
+            <PlayerStage currentSong={currentSong} isPlaying={isPlaying} />
 
-          <MediaPlayer
-            currentSong={currentSong}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            volume={volume}
-            audioRef={audioRef}
-            onTogglePlay={togglePlay}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
-            onVolumeChange={setVolume}
-            onSeek={handleSeek}
-            isLiked={currentSong ? isLiked(currentSong.id) : false}
-            onToggleLike={handleToggleLike}
-          />
+            {currentSong && (
+              <PlayerControls
+                currentSong={currentSong}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                duration={duration}
+                rate={rate}
+                volume={volume}
+                mod={mod}
+                audioRef={audioRef}
+                isLiked={isLiked(currentSong.id)}
+                onTogglePlay={togglePlay}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                onShuffle={handleShuffle}
+                onSeek={handleSeek}
+                onVolumeChange={setVolume}
+                onModChange={setMod}
+                onToggleLike={handleToggleLike}
+              />
+            )}
+          </main>
+
+          <AnimatePresence>
+            {libraryOpen && (
+              <LibraryPanel
+                songs={songs}
+                currentIndex={currentIndex}
+                likedSongs={likedSongs}
+                isScanning={isScanning}
+                onSongSelect={playSong}
+                onClose={() => setLibraryOpen(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
