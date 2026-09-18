@@ -1,7 +1,8 @@
 'use client';
 
 import { Song, SortKey, SORT_LABEL } from '@/types';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'framer-motion';
 import { BiSearch, BiMusic } from 'react-icons/bi';
 import {
@@ -164,6 +165,8 @@ function LibraryPanelComponent({
 
   const currentId = songs[currentIndex]?.id;
 
+  const listScrollRef = useRef<HTMLDivElement>(null);
+
   const displaySongs = useMemo(() => {
     const base = tab === 'liked' ? songs.filter((s) => likedSongs.has(s.id)) : songs;
     const q = query.trim().toLowerCase();
@@ -177,6 +180,15 @@ function LibraryPanelComponent({
       : base;
     return sortSongs(filtered, sortKey);
   }, [songs, likedSongs, tab, query, sortKey]);
+
+  // Library folders can hold thousands of maps — rendering every row at once
+  // was freezing the tab and ballooning memory, so only visible rows mount.
+  const rowVirtualizer = useVirtualizer({
+    count: displaySongs.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => 60,
+    overscan: 12,
+  });
 
   return (
     <motion.aside
@@ -256,7 +268,7 @@ function LibraryPanelComponent({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={listScrollRef} className="flex-1 overflow-y-auto">
         {tab === 'queue' ? (
           queueSongs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-white/40 px-6 text-center gap-3">
@@ -303,19 +315,32 @@ function LibraryPanelComponent({
             </p>
           </div>
         ) : (
-          <div className="p-2 space-y-0.5">
-            {displaySongs.map((song) => (
-              <SongRow
-                key={song.id}
-                song={song}
-                index={indexById.get(song.id) ?? -1}
-                isActive={song.id === currentId}
-                showBpm={sortKey === 'bpm'}
-                onSelect={onSongSelect}
-                onEnqueue={onEnqueue}
-                onPlayNext={onPlayNext}
-              />
-            ))}
+          <div
+            className="relative w-full"
+            style={{ height: rowVirtualizer.getTotalSize() }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const song = displaySongs[virtualRow.index];
+              return (
+                <div
+                  key={song.id}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="absolute top-0 left-2 right-2 py-[1px]"
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  <SongRow
+                    song={song}
+                    index={indexById.get(song.id) ?? -1}
+                    isActive={song.id === currentId}
+                    showBpm={sortKey === 'bpm'}
+                    onSelect={onSongSelect}
+                    onEnqueue={onEnqueue}
+                    onPlayNext={onPlayNext}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
