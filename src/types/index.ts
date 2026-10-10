@@ -11,6 +11,13 @@ export interface Song {
   dateAdded: number;
 }
 
+export interface Playlist {
+  id: string;
+  name: string;
+  songIds: string[];
+  createdAt: number;
+}
+
 export type PlaybackMod = 'none' | 'dt';
 
 export type RepeatMode = 'off' | 'all' | 'one';
