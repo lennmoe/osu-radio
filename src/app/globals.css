@@ -48,12 +48,6 @@
 }
 
 @layer components {
-  /* Skip layout/paint for off-screen library rows (huge lists stay smooth). */
-  .lib-row {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 60px;
-  }
-
   /* Shared thin slider used by the seek + volume controls. */
   .radio-range {
     -webkit-appearance: none;
@@ -88,11 +82,7 @@
   }
 }
 
-@keyframes radio-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-radio-float {
-  animation: radio-float 6s ease-in-out infinite;
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
 }
